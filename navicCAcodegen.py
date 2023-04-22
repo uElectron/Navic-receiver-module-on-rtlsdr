@@ -1,5 +1,11 @@
 ## Generate CA code for NavIC 
-def generateNavicCaCode(prn):
+import numpy as np
+
+codeFreqBasis = 1023000.0
+codeLength = 1023
+
+
+def genNavicCaCode(prn):
     """
     Takes PRN (ie Satellite ID - 1 ) as Input  and outputs CA code sequece (chips) of 1023 length.
     In Output : -1 refers to '0' Binary state and +1 refers to '1' Binary state in Polar NRZ format
@@ -35,3 +41,36 @@ def generateNavicCaCode(prn):
     CAcode = -g1 * g2
     
     return CAcode
+
+def genNavicCaTable(samplingFreq):
+    """
+    Takes Sampling Frequecy as input.
+    Return CA code table of Navic giving all 14 PRN codes.
+    """
+    ## make CA table corresponding to the sampling frequecy
+    samplesPerCode = np.long(np.round(samplingFreq / (codeFreqBasis / codeLength)))
+    caCodesTable = np.zeros((32, samplesPerCode),np.int8)
+    # --- Find time periods --------------------------------------------------
+    tsamp = 1.0 / samplingFreq
+
+    tcode = 1.0 / codeFreqBasis
+
+    # === For all satellite PRN-s ...
+    for PRN in range(14):
+        # --- Generate CA code for given PRN -----------------------------------
+        caCode = genNavicCaCode(PRN)
+
+        # --- Make index array to read C/A code values -------------------------
+        # The length of the index array depends on the sampling frequency -
+        # number of samples per millisecond (because one C/A code period is one
+        # millisecond).
+        codeValueIndex = np.ceil( (tsamp/tcode) * np.arange(1, samplesPerCode + 1) ) - 1
+        codeValueIndex = np.int16(codeValueIndex)
+
+        codeValueIndex[-1] = 1022
+
+        # The "upsampled" code is made by selecting values form the CA code
+        # chip array (caCode) for the time instances of each sample.
+        caCodesTable[PRN] = caCode[codeValueIndex]
+    return caCodesTable
+
